@@ -1,10 +1,5 @@
-using System.Collections.Concurrent;
-using System.Security.Cryptography;
-using Miningcore.Blockchain.Kaspa.Kaspad;
+
 using Miningcore.Crypto;
-using Miningcore.Crypto.Hashing.XenomHash;
-using Miningcore.Time;
-using NBitcoin;
 
 
 namespace Miningcore.Blockchain.Kaspa.Custom.Xenom;
@@ -153,28 +148,11 @@ public class XenomMatrix
 public class XenomJob  : KaspaJob
 {
 
-    protected IMasterClock clock;
-    protected double shareMultiplier;
-    public RpcBlock BlockTemplate { get; protected set; }
-    public double Difficulty { get; protected set; }
-    public string JobId { get; protected set; }
-    public uint256 blockTargetValue { get; protected set; }
 
-    protected object[] jobParams;
-    private readonly ConcurrentDictionary<string, bool> submissions = new(StringComparer.OrdinalIgnoreCase);
     public XenomJob(IHashAlgorithm customBlockHeaderHasher, IHashAlgorithm customCoinbaseHasher, IHashAlgorithm customShareHasher) : base(customBlockHeaderHasher, customCoinbaseHasher, customShareHasher)
     {
     }
-    public override void Init(RpcBlock blockTemplate, string jobId, double shareMultiplier)
-    {
-        base.Init(blockTemplate, jobId, shareMultiplier);
 
-        var prePowHash = SerializeHeader(blockTemplate.Header, true);
-        var xenomMatrix = XenomMatrix.Generate(prePowHash.ToArray());
-
-        // Replace hashing logic with Xenom's heavy hashing
-
-    }
 
     protected override Span<byte> ComputeCoinbase(Span<byte> prePowHash, Span<byte> data)
     {

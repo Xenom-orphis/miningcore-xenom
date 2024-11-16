@@ -29,20 +29,26 @@ public class KaspaXoShiRo256PlusPlus
         }
     }
 
-    public ulong Uint64()
+    public ulong Next()
     {
-        ulong result = RotateLeft64(this.s[0] + this.s[3], 23) + this.s[0];
-        ulong t = this.s[1] << 17;
-        this.s[2] ^= this.s[0];
-        this.s[3] ^= this.s[1];
-        this.s[1] ^= this.s[2];
-        this.s[0] ^= this.s[3];
-        this.s[2] ^= t;
-        this.s[3] = RotateLeft64(this.s[3], 45);
+        // Calculate the result of the next number
+        ulong result = RotateLeft(s[0] + s[3], 23) + s[0];
+
+        // Perform the XoShiRo256++ state transitions
+        ulong t = s[1] << 17;
+
+        s[2] ^= s[0];
+        s[3] ^= s[1];
+        s[1] ^= s[2];
+        s[0] ^= s[3];
+
+        s[2] ^= t;
+        s[3] = RotateLeft(s[3], 45);
+
         return result;
     }
 
-    private static ulong RotateLeft64(ulong value, int offset)
+    private static ulong RotateLeft(ulong value, int offset)
     {
         return (value << offset) | (value >> (64 - offset));
     }
@@ -104,10 +110,10 @@ public class KaspaJob
             {
                 for (int j = 0; j < 64; j += 16)
                 {
-                    ulong val = generator.Uint64();
+                    ulong value = generator.Next();
                     for (int shift = 0; shift < 16; shift++)
                     {
-                        matrix[i][j + shift] = (ushort)((val >> (4 * shift)) & 0x0F);
+                        matrix[i][j + shift] = (ushort)((value >> (4 * shift)) & 0x0F);
                     }
                 }
             }
@@ -307,8 +313,8 @@ public class KaspaJob
             {
                 ratio = shareDiff / context.PreviousDifficulty.Value;
 
-               // if(ratio < 0.99)
-                //    throw new StratumException(StratumError.LowDifficultyShare, $"low difficulty share ({shareDiff})");
+                if(ratio < 0.99)
+                    throw new StratumException(StratumError.LowDifficultyShare, $"low difficulty share ({shareDiff})");
 
                 // use previous difficulty
                 stratumDifficulty = context.PreviousDifficulty.Value;

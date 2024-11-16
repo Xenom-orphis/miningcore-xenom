@@ -16,6 +16,7 @@ using Miningcore.Blockchain.Kaspa.Configuration;
 using Miningcore.Blockchain.Kaspa.Custom.Astrix;
 using Miningcore.Blockchain.Kaspa.Custom.Karlsencoin;
 using Miningcore.Blockchain.Kaspa.Custom.Pyrin;
+using Miningcore.Blockchain.Kaspa.Custom.Xenom;
 using Miningcore.Blockchain.Kaspa.Custom.Spectre;
 using NLog;
 using Miningcore.Configuration;
@@ -329,6 +330,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
 
 
                     logger.Debug(() => $"blake3HardFork activated");
+                    logger.Debug(() => $"blake3HardFork activated");
 
                     if(customBlockHeaderHasher is not Blake3)
                     {
@@ -343,7 +345,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
                     if(customShareHasher is not Blake3)
                         customShareHasher = new Blake3();
 
-                return new PyrinJob(customBlockHeaderHasher, customCoinbaseHasher, customShareHasher);
+                return new XenomJob(customBlockHeaderHasher, customCoinbaseHasher, customShareHasher);
 
             case "SPR":
                 if(customBlockHeaderHasher is not Blake2b)

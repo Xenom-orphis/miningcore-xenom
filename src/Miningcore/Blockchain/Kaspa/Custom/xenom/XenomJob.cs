@@ -90,7 +90,8 @@ public class XenomMatrix
         var result = new byte[hash.Length];
         for (int i = 0; i < hash.Length; i++)
         {
-            byte row = hash[i];
+            // Ensure the row index is within bounds
+            int row = hash[i] % 64;
             for (int j = 0; j < 64; j++)
             {
                 result[i] ^= (byte)(_matrix[row, j] & 0xFF);

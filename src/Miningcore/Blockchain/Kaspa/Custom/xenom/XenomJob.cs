@@ -173,7 +173,7 @@ public class XenomJob  : KaspaJob
         var xenomMatrix = XenomMatrix.Generate(prePowHash.ToArray());
 
         // Replace hashing logic with Xenom's heavy hashing
-        blockHeaderHasher = new XenomHasher(xenomMatrix);
+
     }
 
     protected override Span<byte> ComputeCoinbase(Span<byte> prePowHash, Span<byte> data)

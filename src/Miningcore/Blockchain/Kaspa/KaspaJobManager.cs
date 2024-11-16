@@ -18,10 +18,11 @@ using Miningcore.Blockchain.Kaspa.Custom.Karlsencoin;
 using Miningcore.Blockchain.Kaspa.Custom.Pyrin;
 using Miningcore.Blockchain.Kaspa.Custom.Xenom;
 using Miningcore.Blockchain.Kaspa.Custom.Spectre;
-using NLog;
+
 using Miningcore.Configuration;
 using Miningcore.Crypto;
 using Miningcore.Crypto.Hashing.Algorithms;
+using Miningcore.Crypto.Hashing.XenomHash;
 using Miningcore.Extensions;
 using Miningcore.Messaging;
 using Miningcore.Mining;
@@ -334,9 +335,12 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
 
                     if(customBlockHeaderHasher is not Blake3)
                     {
+
+
                         string coinbaseBlockHash = KaspaConstants.CoinbaseBlockHash;
                         byte[] hashBytes = Encoding.UTF8.GetBytes(coinbaseBlockHash.PadRight(32, '\0')).Take(32).ToArray();
-                        customBlockHeaderHasher = new Blake3(hashBytes);
+                        var xenomMatrix = XenomMatrix.Generate(hashBytes);
+                        customBlockHeaderHasher =  new XenomHasher(xenomMatrix);
                     }
 
                     if(customCoinbaseHasher is not Blake3)
@@ -345,7 +349,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
                     if(customShareHasher is not Blake3)
                         customShareHasher = new Blake3();
 
-                return new XenomJob(customBlockHeaderHasher, customCoinbaseHasher, customShareHasher);
+                    return new XenomJob(customBlockHeaderHasher, customCoinbaseHasher, customShareHasher);
 
             case "SPR":
                 if(customBlockHeaderHasher is not Blake2b)

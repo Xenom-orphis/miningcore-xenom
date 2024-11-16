@@ -4994,7 +4994,7 @@
         "addressBech32PrefixTestnet": "bricstest",
         "explorerBlockLink": "https://explorer.bricspro.site/blocks/$hash$",
         "explorerTxLink": "https://explorer.bricspro.site/txs/{0}",
-        "explorerAccountLink": "https://explorer.bricspro.site/addresses/{0}"   
+        "explorerAccountLink": "https://explorer.bricspro.site/addresses/{0}"
     },
     "bugna": {
         "name": "Bugna Network",
@@ -5084,7 +5084,7 @@
         "addressBech32PrefixTestnet": "kasv2test",
         "explorerBlockLink": "https://explorer.kaspa-v2.services/blocks/$hash$",
         "explorerTxLink": "https://explorer.kaspa-v2.services/txs/{0}",
-        "explorerAccountLink": "https://explorer.kaspa-v2.services/addresses/{0}"   
+        "explorerAccountLink": "https://explorer.kaspa-v2.services/addresses/{0}"
     },
     "kaspaclassic": {
         "name": "Kaspa Classic",
@@ -5244,5 +5244,24 @@
         "explorerBlockLink": "https://wartscan.io/block/$height$",
         "explorerTxLink": "https://wartscan.io/tx/{0}",
         "explorerAccountLink": "https://wartscan.io/account/{0}"
+    },
+
+    "xenom": {
+        "name": "Xenom",
+        "canonicalName": "Xenom",
+        "symbol": "XEN",
+        "family": "kaspa",
+        "website": "https://pyrin.network/",
+        "market": "https://coinmarketcap.com/currencies/pyrin/",
+        "twitter": "https://twitter.com/pyrin_network",
+        "telegram": "https://t.me/pyrin_network",
+        "discord": "https://discord.gg/QQgWRntF",
+        "addressBech32Prefix": "xenom",
+        "addressBech32PrefixDevnet": "xenomdev",
+        "addressBech32PrefixSimnet": "xenomsim",
+        "addressBech32PrefixTestnet": "xenomtest",
+        "explorerBlockLink": "https://explorer.pyrin.network/blocks/$hash$",
+        "explorerTxLink": "https://explorer.pyrin.network/txs/{0}",
+        "explorerAccountLink": "https://explorer.pyrin.network/addresses/{0}"
     }
 }

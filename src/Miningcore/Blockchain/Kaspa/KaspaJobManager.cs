@@ -50,7 +50,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
         this.clock = clock;
         this.extraNonceProvider = extraNonceProvider;
     }
-    
+
     private DaemonEndpointConfig[] daemonEndpoints;
     private DaemonEndpointConfig[] walletDaemonEndpoints;
     private KaspaCoinTemplate coin;
@@ -66,7 +66,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
     protected IHashAlgorithm customBlockHeaderHasher;
     protected IHashAlgorithm customCoinbaseHasher;
     protected IHashAlgorithm customShareHasher;
-    
+
     protected IObservable<kaspad.RpcBlock> KaspaSubscribeNewBlockTemplate(CancellationToken ct, object payload = null,
         JsonSerializerSettings payloadJsonSerializerSettings = null)
     {
@@ -161,18 +161,18 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
                                         goto end_gameover;
                                 }
                         }
-                        
+
                         end_gameover:
                             // We make sure the stream is closed in order to free resources and avoid reaching the "RPC inbound connections limitation"
                             await streamNotifyNewBlockTemplate.RequestStream.CompleteAsync();
                             logger.Debug(() => $"No more data received. Bye!");
                 }
             }, cts.Token);
-            
+
             return Disposable.Create(() => { cts.Cancel(); });
         }));
     }
-    
+
     private void SetupJobUpdates(CancellationToken ct)
     {
         var blockFound = blockFoundSubject.Synchronize();
@@ -187,7 +187,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
         var getWorkKaspad = KaspaSubscribeNewBlockTemplate(ct)
             .Publish()
             .RefCount();
-            
+
         triggers.Add(getWorkKaspad
             .Select(blockTemplate => (JobRefreshBy.BlockTemplateStream, blockTemplate))
             .Publish()
@@ -211,7 +211,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
             .Publish()
             .RefCount();
     }
-    
+
     private KaspaJob CreateJob(ulong blockHeight)
     {
         switch(coin.Symbol)
@@ -229,6 +229,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
                 return new AstrixJob(customBlockHeaderHasher, customCoinbaseHasher, customShareHasher);
             case "CAS":
             case "HTN":
+
                 if(customBlockHeaderHasher is not Blake3)
                 {
                     string coinbaseBlockHash = KaspaConstants.CoinbaseBlockHash;
@@ -292,6 +293,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
 
                 return new KarlsencoinJob(customBlockHeaderHasher, customCoinbaseHasher, customShareHasher);
             case "PYI":
+            case "XEN":
                 if(blockHeight >= PyrinConstants.Blake3ForkHeight)
                 {
                     logger.Debug(() => $"blake3HardFork activated");
@@ -334,7 +336,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
 
                 return new SpectreJob(customBlockHeaderHasher, customCoinbaseHasher, customShareHasher);
         }
-        
+
         if(customBlockHeaderHasher is not Blake2b)
             customBlockHeaderHasher = new Blake2b(Encoding.UTF8.GetBytes(KaspaConstants.CoinbaseBlockHash));
 
@@ -372,10 +374,10 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
                         job = CreateJob(blockTemplate.Header.DaaScore);
 
                         job.Init(blockTemplate, NextJobId("D"), ShareMultiplier);
-                        
+
                         logger.Debug(() => $"blockTargetValue: {job.blockTargetValue}");
                         logger.Debug(() => $"Difficulty: {job.Difficulty}");
-                        
+
                         if(via != null)
                             logger.Info(() => $"Detected new block {job.BlockTemplate.Header.DaaScore} [{via}]");
                         else
@@ -389,7 +391,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
                             BlockchainStats.BlockHeight = job.BlockTemplate.Header.DaaScore;
                             BlockchainStats.NetworkDifficulty = job.Difficulty;
                         }
-                        
+
                         currentJob = job;
                     }
                     else
@@ -417,7 +419,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
             }
         }, cts.Token);
     }
-    
+
     private async Task UpdateNetworkStatsAsync(CancellationToken ct)
     {
         try
@@ -436,7 +438,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
             {
                 if(string.IsNullOrEmpty(infoHashrate.EstimateNetworkHashesPerSecondResponse.Error?.Message))
                     BlockchainStats.NetworkHashrate = (double) infoHashrate.EstimateNetworkHashesPerSecondResponse.NetworkHashesPerSecond;
-                
+
                 break;
             }
 
@@ -447,7 +449,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
             {
                 if(string.IsNullOrEmpty(info.GetConnectedPeerInfoResponse.Error?.Message))
                     BlockchainStats.ConnectedPeers = info.GetConnectedPeerInfoResponse.Infos.Count;
-                
+
                 break;
             }
             await stream.RequestStream.CompleteAsync();
@@ -475,7 +477,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
 
             if(info.GetInfoResponse.IsSynced != true && info.GetInfoResponse.IsUtxoIndexed != true)
                 logger.Info(() => $"Daemon is downloading headers ...");
-            
+
             break;
         }
         await stream.RequestStream.CompleteAsync();
@@ -485,14 +487,14 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
         JsonSerializerSettings payloadJsonSerializerSettings = null)
     {
         Contract.RequiresNonNull(block);
-        
+
         bool succeed = false;
 
         try
         {
             // we need a stream to communicate with Kaspad
             var stream = rpc.MessageStream(null, null, ct);
-            
+
             var request = new kaspad.KaspadMessage();
             request.SubmitBlockRequest = new kaspad.SubmitBlockRequestMessage
             {
@@ -515,14 +517,14 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
             }
             await stream.RequestStream.CompleteAsync();
         }
-        
+
         catch(Exception ex)
         {
             // We lost that battle
             logger.Error(() => $"{ex.GetType().Name} '{ex.Message}' while submitting block");
             messageBus.SendMessage(new AdminNotification("Block submission failed", $"Pool {poolConfig.Id} failed to submit block"));
         }
-        
+
         return succeed;
     }
 
@@ -553,7 +555,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
 
         return responseData;
     }
-    
+
     public int GetExtraNonce1Size()
     {
         return extraPoolConfig?.ExtraNonce1Size ?? 2;
@@ -563,7 +565,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
     {
         Contract.RequiresNonNull(worker);
         Contract.RequiresNonNull(submission);
-        
+
         if(submission is not object[] submitParams)
             throw new StratumException(StratumError.Other, "invalid params");
 
@@ -615,7 +617,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
 
             // is it still a block candidate?
             share.IsBlockCandidate = acceptResponse;
-            
+
             if(share.IsBlockCandidate)
             {
                 logger.Info(() => $"Daemon accepted block {share.BlockHeight} [{share.BlockHash}] submitted by {context.Miner}");
@@ -635,49 +637,49 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
 
         return share;
     }
-    
+
     public bool ValidateIsLargeJob(string userAgent)
     {
         if(string.IsNullOrEmpty(userAgent))
             return false;
-        
+
         if(ValidateIsBzMiner(userAgent))
             return true;
-        
+
         if(ValidateIsIceRiverMiner(userAgent))
             return true;
 
         if(ValidateIsGoldShell(userAgent))
             return true;
-        
+
         return false;
     }
-    
+
     public bool ValidateIsBzMiner(string userAgent)
     {
         if(string.IsNullOrEmpty(userAgent))
             return false;
-        
+
         // Find matches
         MatchCollection matchesUserAgentBzMiner = KaspaConstants.RegexUserAgentBzMiner.Matches(userAgent);
         return (matchesUserAgentBzMiner.Count > 0);
     }
-    
+
     public bool ValidateIsGodMiner(string userAgent)
     {
         if(string.IsNullOrEmpty(userAgent))
             return false;
-        
+
         // Find matches
         MatchCollection matchesUserAgentGodMiner = KaspaConstants.RegexUserAgentGodMiner.Matches(userAgent);
         return (matchesUserAgentGodMiner.Count > 0);
     }
-    
+
     public bool ValidateIsIceRiverMiner(string userAgent)
     {
         if(string.IsNullOrEmpty(userAgent))
             return false;
-        
+
         // Find matches
         MatchCollection matchesUserAgentIceRiverMiner = KaspaConstants.RegexUserAgentIceRiverMiner.Matches(userAgent);
         return (matchesUserAgentIceRiverMiner.Count > 0);
@@ -687,7 +689,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
     {
         if(string.IsNullOrEmpty(userAgent))
             return false;
-        
+
         // Find matches
         MatchCollection matchesUserAgentGoldShell = KaspaConstants.RegexUserAgentGoldShell.Matches(userAgent);
         return (matchesUserAgentGoldShell.Count > 0);
@@ -697,7 +699,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
     {
         if(string.IsNullOrEmpty(userAgent))
             return false;
-        
+
         // Find matches
         MatchCollection matchesUserAgentTNNMiner = KaspaConstants.RegexUserAgentTNNMiner.Matches(userAgent);
         return (matchesUserAgentTNNMiner.Count > 0);
@@ -714,10 +716,10 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
         // validate pool address
         if(string.IsNullOrEmpty(poolConfig.Address))
             throw new PoolStartupException($"Pool address is not configured", poolConfig.Id);
-        
+
         // we need a stream to communicate with Kaspad
         var stream = rpc.MessageStream(null, null, ct);
-        
+
         var request = new kaspad.KaspadMessage();
         request.GetCurrentNetworkRequest = new kaspad.GetCurrentNetworkRequestMessage();
         await Guard(() => stream.RequestStream.WriteAsync(request),
@@ -726,17 +728,17 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
         {
             if(!string.IsNullOrEmpty(currentNetwork.GetCurrentNetworkResponse.Error?.Message))
                 throw new PoolStartupException($"Daemon reports: {currentNetwork.GetCurrentNetworkResponse.Error?.Message}", poolConfig.Id);
-            
+
             network = currentNetwork.GetCurrentNetworkResponse.CurrentNetwork;
             break;
         }
-        
+
         var (kaspaAddressUtility, errorKaspaAddressUtility) = KaspaUtils.ValidateAddress(poolConfig.Address, network, coin);
         if(errorKaspaAddressUtility != null)
             throw new PoolStartupException($"Pool address: {poolConfig.Address} is invalid for network [{network}]: {errorKaspaAddressUtility}", poolConfig.Id);
         else
             logger.Info(() => $"Pool address: {poolConfig.Address} => {KaspaConstants.KaspaAddressType[kaspaAddressUtility.KaspaAddress.Version()]}");
-        
+
         // update stats
         BlockchainStats.NetworkType = network;
         BlockchainStats.RewardType = "POW";
@@ -749,10 +751,10 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
         {
             if(!string.IsNullOrEmpty(info.GetInfoResponse.Error?.Message))
                 throw new PoolStartupException($"Daemon reports: {info.GetInfoResponse.Error?.Message}", poolConfig.Id);
-            
+
             if(info.GetInfoResponse.IsUtxoIndexed != true)
                 throw new PoolStartupException("UTXO index is disabled", poolConfig.Id);
-            
+
             extraData = (string) info.GetInfoResponse.ServerVersion + (!string.IsNullOrEmpty(extraData) ? "." + extraData : "");
             break;
         }
@@ -763,7 +765,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
         {
             // we need a call to communicate with kaspadWallet
             var call = walletRpc.ShowAddressesAsync(new kaspaWalletd.ShowAddressesRequest(), null, null, ct);
-            
+
             // check configured address belongs to wallet
             var walletAddresses = await Guard(() => call.ResponseAsync,
                 ex=> throw new PoolStartupException($"Error validating pool address '{ex.GetType().Name}' : {ex}", poolConfig.Id));
@@ -772,7 +774,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
             if(!walletAddresses.Address.Contains(poolConfig.Address))
                 throw new PoolStartupException($"Pool address: {poolConfig.Address} is not controlled by pool wallet", poolConfig.Id);
         }
-        
+
         await UpdateNetworkStatsAsync(ct);
 
         // Periodically update network stats
@@ -792,15 +794,15 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
 
         extraPoolConfig = pc.Extra.SafeExtensionDataAs<KaspaPoolConfigExtra>();
         extraPoolPaymentProcessingConfig = pc.PaymentProcessing.Extra.SafeExtensionDataAs<KaspaPaymentProcessingConfigExtra>();
-        
+
         maxActiveJobs = extraPoolConfig?.MaxActiveJobs ?? 8;
         extraData = extraPoolConfig?.ExtraData ?? "Miningcore.developers[\"Cedric CRISPIN\"]";
-        
+
         // extract standard daemon endpoints
         daemonEndpoints = pc.Daemons
             .Where(x => string.IsNullOrEmpty(x.Category))
             .ToArray();
-        
+
         if(cc.PaymentProcessing?.Enabled == true && pc.PaymentProcessing?.Enabled == true)
         {
             // extract wallet daemon endpoints
@@ -818,9 +820,9 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
     protected override void ConfigureDaemons()
     {
         logger.Debug(() => $"ProtobufDaemonRpcServiceName: {extraPoolConfig?.ProtobufDaemonRpcServiceName ?? KaspaConstants.ProtobufDaemonRpcServiceName}");
-        
+
         rpc = KaspaClientFactory.CreateKaspadRPCClient(daemonEndpoints, extraPoolConfig?.ProtobufDaemonRpcServiceName ?? KaspaConstants.ProtobufDaemonRpcServiceName);
-        
+
         // Payment-processing setup
         if(clusterConfig.PaymentProcessing?.Enabled == true && poolConfig.PaymentProcessing?.Enabled == true)
         {
@@ -846,10 +848,10 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
             if(walletAddresses == null)
                 return false;
         }
-        
+
         // we need a stream to communicate with Kaspad
         var stream = rpc.MessageStream(null, null, ct);
-        
+
         var request = new kaspad.KaspadMessage();
         request.GetInfoRequest = new kaspad.GetInfoRequestMessage();
         await Guard(() => stream.RequestStream.WriteAsync(request),
@@ -862,14 +864,14 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
                 logger.Debug(info.GetInfoResponse.Error?.Message);
                 return false;
             }
-            
+
             if(info.GetInfoResponse.IsUtxoIndexed != true)
                 throw new PoolStartupException("UTXO index is disabled", poolConfig.Id);
-            
+
             // update stats
             if(info.GetInfoResponse.ServerVersion != null)
                 BlockchainStats.NodeVersion = (string) info.GetInfoResponse.ServerVersion;
-            
+
             areDaemonsHealthy = true;
             break;
         }
@@ -894,10 +896,10 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
             if(walletAddresses == null)
                 return false;
         }
-        
+
         // we need a stream to communicate with Kaspad
         var stream = rpc.MessageStream(null, null, ct);
-        
+
         var request = new kaspad.KaspadMessage();
         request.GetConnectedPeerInfoRequest = new kaspad.GetConnectedPeerInfoRequestMessage();
         await Guard(() => stream.RequestStream.WriteAsync(request),
@@ -912,11 +914,11 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
             }
             else
                 totalPeers = info.GetConnectedPeerInfoResponse.Infos.Count;
-            
+
             break;
         }
         await stream.RequestStream.CompleteAsync();
-        
+
         return totalPeers > 0;
     }
 
@@ -929,7 +931,7 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
         do
         {
             var isSynched = false;
-            
+
             // we need a stream to communicate with Kaspad
             var stream = rpc.MessageStream(null, null, ct);
 

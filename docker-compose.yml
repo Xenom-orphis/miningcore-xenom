@@ -1,0 +1,25 @@
+﻿services:
+  miningcore:
+    build: .
+    #entrypoint: ["./build/Miningcore","-c", "config.json"]
+    volumes:
+      - ./config.json:/app/config.json
+    network_mode: host
+    ports:
+      - 9000:4000
+      - 4077:4050
+      - "0.0.0.0:3100:3100"
+
+  postgres:
+    container_name: postgres_container
+    image: postgres:latest
+    restart: always
+    volumes:
+      - ./postgres_data_xenom_release:/var/lib/postgresql/data
+      - ./createdb.sql:/docker-entrypoint-initdb.d/create_tables.sql
+    environment:
+      POSTGRES_USER: miningcore
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: miningcore
+    ports:
+      - 5435:5432

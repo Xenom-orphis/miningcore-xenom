@@ -7,6 +7,7 @@ using Miningcore.Blockchain.Kaspa.Custom.Xenom;
 using Miningcore.Contracts;
 using Miningcore.Crypto;
 using Miningcore.Crypto.Hashing.Algorithms;
+using Miningcore.Crypto.Hashing.XenomHash;
 using Miningcore.Extensions;
 using Miningcore.Stratum;
 using Miningcore.Time;
@@ -254,8 +255,8 @@ public class KaspaJob
             stream.Write(blueWorkBytes);
 
             stream.Write(header.PruningPoint.HexToByteArray());
-
-            blockHeaderHasher.Digest(stream.ToArray(), hashBytes);
+            var xenomMatrix = XenomMatrix.Generate(hashBytes.ToArray());
+            new XenomHasher(xenomMatrix).Digest(stream.ToArray(), hashBytes);
 
             return (Span<byte>) hashBytes.ToArray();
         }

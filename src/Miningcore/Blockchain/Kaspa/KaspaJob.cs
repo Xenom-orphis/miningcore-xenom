@@ -12,6 +12,7 @@ using Miningcore.Stratum;
 using Miningcore.Time;
 using Miningcore.Util;
 using NBitcoin;
+using NLog;
 using kaspad = Miningcore.Blockchain.Kaspa.Kaspad;
 
 namespace Miningcore.Blockchain.Kaspa;
@@ -311,14 +312,15 @@ public class KaspaJob
                 ratio = shareDiff / context.PreviousDifficulty.Value;
 
                 if(ratio < 0.99)
-                    throw new StratumException(StratumError.LowDifficultyShare, $"low difficulty share ({shareDiff})");
+
+
+                    //throw new StratumException(StratumError.LowDifficultyShare, $"low difficulty share ({shareDiff})");
 
                 // use previous difficulty
                 stratumDifficulty = context.PreviousDifficulty.Value;
             }
 
-            else
-                throw new StratumException(StratumError.LowDifficultyShare, $"low difficulty share ({shareDiff})");
+
         }
 
         var result = new Share

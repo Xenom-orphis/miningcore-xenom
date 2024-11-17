@@ -47,9 +47,9 @@ public class XoShiRo256PlusPlus
 }
 public class XenomMatrix
 {
-    private readonly ushort[,] _matrix;
+    public readonly ushort[][] _matrix;
 
-    public XenomMatrix(ushort[,] matrix)
+    public XenomMatrix(ushort[][] matrix)
     {
         _matrix = matrix;
     }
@@ -60,7 +60,12 @@ public class XenomMatrix
             throw new ArgumentException("hashBytes must be exactly 32 bytes");
 
         var generator = new XoShiRo256PlusPlus(hashBytes);
-        var matrix = new ushort[64, 64];
+        var matrix = new ushort[64][];
+
+        for (int i = 0; i < 64; i++)
+        {
+            matrix[i] = new ushort[64];
+        }
 
         // Matrix generation logic
         while (true)
@@ -72,7 +77,7 @@ public class XenomMatrix
                     ulong value = generator.Next();
                     for (int shift = 0; shift < 16; shift++)
                     {
-                        matrix[i, j + shift] = (ushort)((value >> (4 * shift)) & 0x0F);
+                        matrix[i][j + shift] = (ushort)((value >> (4 * shift)) & 0x0F);
                     }
                 }
             }
@@ -93,18 +98,18 @@ public class XenomMatrix
             int row = hash[i] % 64;
             for (int j = 0; j < 64; j++)
             {
-                result[i] ^= (byte)(_matrix[row, j] & 0xFF);
+                result[i] ^= (byte)(_matrix[row][j] & 0xFF);
             }
         }
 
         return result;
     }
 
-    private static int ComputeRank(ushort[,] matrix)
+    private static int ComputeRank(ushort[][] matrix)
     {
         int rank = 0;
         double epsilon = 1e-9;
-        var rows = Enumerable.Range(0, 64).Select(i => Enumerable.Range(0, 64).Select(j => (double)matrix[i, j]).ToArray()).ToArray();
+        var rows = Enumerable.Range(0, 64).Select(i => Enumerable.Range(0, 64).Select(j => (double)matrix[i][j]).ToArray()).ToArray();
         bool[] selected = new bool[64];
 
         for (int i = 0; i < 64; i++)
@@ -146,9 +151,6 @@ public class XenomMatrix
     }
 }
 
-
-
-
 public class XenomJob  : KaspaJob
 {
 
@@ -158,7 +160,7 @@ public class XenomJob  : KaspaJob
     }
 
 
-    protected override Span<byte> ComputeCoinbase(Span<byte> prePowHash, Span<byte> data)
+    protected  Span<byte> ComputeCoinbase(Span<byte> prePowHash, Span<byte> data)
     {
         var xenomMatrix = XenomMatrix.Generate(prePowHash.ToArray());
         var hash = xenomMatrix.HeavyHash(data.ToArray());

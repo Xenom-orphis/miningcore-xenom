@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Collections.Concurrent;
 using System.Text;
+using Miningcore.Blockchain.Kaspa.Custom.Xenom;
 using Miningcore.Contracts;
 using Miningcore.Crypto;
 using Miningcore.Crypto.Hashing.Algorithms;
@@ -97,68 +98,87 @@ public class KaspaJob
 
     protected virtual ushort[][] GenerateMatrix(Span<byte> prePowHash)
     {
-        ushort[][] matrix = new ushort[64][];
-        for (int i = 0; i < 64; i++)
+
+
+        if(prePowHash.Length != 32)
+            throw new ArgumentException("hashBytes must be exactly 32 bytes");
+
+        var generator = new XoShiRo256PlusPlus(prePowHash.ToArray());
+        var matrix = new ushort[64][];
+
+        for(int i = 0; i < 64; i++)
         {
             matrix[i] = new ushort[64];
         }
 
-        var generator = new KaspaXoShiRo256PlusPlus(prePowHash);
-        while (true)
+        // Matrix generation logic
+        while(true)
         {
-            for (int i = 0; i < 64; i++)
+            for(int i = 0; i < 64; i++)
             {
-                for (int j = 0; j < 64; j += 16)
+                for(int j = 0; j < 64; j += 16)
                 {
                     ulong value = generator.Next();
-                    for (int shift = 0; shift < 16; shift++)
+                    for(int shift = 0; shift < 16; shift++)
                     {
-                        matrix[i][j + shift] = (ushort)((value >> (4 * shift)) & 0x0F);
+                        matrix[i][j + shift] = (ushort) ((value >> (4 * shift)) & 0x0F);
                     }
                 }
             }
+
             if(ComputeRank(matrix) == 64)
-                return matrix;
+                break;
+
         }
+        return new XenomMatrix(matrix)._matrix;
     }
 
-    protected virtual int ComputeRank(ushort[][] matrix)
+    private static int ComputeRank(ushort[][] matrix)
     {
-        double Eps = 0.000000001;
-        double[][] B = matrix.Select(row => row.Select(val => (double)val).ToArray()).ToArray();
         int rank = 0;
-        bool[] rowSelected = new bool[64];
+        double epsilon = 1e-9;
+        var rows = Enumerable.Range(0, 64).Select(i => Enumerable.Range(0, 64).Select(j => (double)matrix[i][j]).ToArray()).ToArray();
+        bool[] selected = new bool[64];
+
         for (int i = 0; i < 64; i++)
         {
-            int j;
-            for (j = 0; j < 64; j++)
+            int pivotRow = -1;
+            for (int j = 0; j < 64; j++)
             {
-                if(!rowSelected[j] && Math.Abs(B[j][i]) > Eps)
+                if (!selected[j] && Math.Abs(rows[j][i]) > epsilon)
+                {
+                    pivotRow = j;
                     break;
-            }
-            if(j != 64)
-            {
-                rank++;
-                rowSelected[j] = true;
-                double pivot = B[j][i];
-                for (int p = i + 1; p < 64; p++)
-                {
-                    B[j][p] /= pivot;
                 }
-                for (int k = 0; k < 64; k++)
+            }
+
+            if (pivotRow == -1) continue;
+
+            selected[pivotRow] = true;
+            double pivotValue = rows[pivotRow][i];
+            for (int k = i; k < 64; k++)
+            {
+                rows[pivotRow][k] /= pivotValue;
+            }
+
+            for (int j = 0; j < 64; j++)
+            {
+                if (j != pivotRow && Math.Abs(rows[j][i]) > epsilon)
                 {
-                    if(k != j && Math.Abs(B[k][i]) > Eps)
+                    for (int k = i; k < 64; k++)
                     {
-                        for (int p = i + 1; p < 64; p++)
-                        {
-                            B[k][p] -= B[j][p] * B[k][i];
-                        }
+                        rows[j][k] -= rows[pivotRow][k] * rows[j][i];
                     }
                 }
             }
+
+            rank++;
         }
+
         return rank;
     }
+
+
 
     protected virtual Span<byte> ComputeCoinbase(Span<byte> prePowHash, Span<byte> data)
     {

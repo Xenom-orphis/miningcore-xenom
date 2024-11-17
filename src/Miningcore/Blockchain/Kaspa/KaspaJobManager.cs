@@ -332,13 +332,10 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
 
                 if (customBlockHeaderHasher is not Blake3)
                 {
+
                     string coinbaseBlockHash = KaspaConstants.CoinbaseBlockHash;
                     byte[] hashBytes = Encoding.UTF8.GetBytes(coinbaseBlockHash.PadRight(32, '\0')).Take(32).ToArray();
-
-                    logger.Debug(() => $"Generated hashBytes size: {hashBytes.Length}");
-
-                    var xenomMatrix = XenomMatrix.Generate(hashBytes);
-                    customBlockHeaderHasher = new XenomHasher(xenomMatrix);
+                    customBlockHeaderHasher = new Blake3(hashBytes);
                 }
 
                 if (customCoinbaseHasher is not Blake3)

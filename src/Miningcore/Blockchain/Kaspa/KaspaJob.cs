@@ -339,14 +339,14 @@ public class KaspaJob
                 ratio = shareDiff / context.PreviousDifficulty.Value;
 
                 if(ratio < 0.99)
-                    throw new StratumException(StratumError.LowDifficultyShare, $"low difficulty share ({shareDiff})");
+                   // throw new StratumException(StratumError.LowDifficultyShare, $"low difficulty share ({shareDiff})");
 
                 // use previous difficulty
                 stratumDifficulty = context.PreviousDifficulty.Value;
             }
 
-            else
-                throw new StratumException(StratumError.LowDifficultyShare, $"low difficulty share ({shareDiff})");
+            //else
+                //throw new StratumException(StratumError.LowDifficultyShare, $"low difficulty share ({shareDiff})");
         }
 
         var result = new Share

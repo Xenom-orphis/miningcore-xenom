@@ -7,7 +7,6 @@ using Miningcore.Blockchain.Kaspa.Custom.Xenom;
 using Miningcore.Contracts;
 using Miningcore.Crypto;
 using Miningcore.Crypto.Hashing.Algorithms;
-using Miningcore.Crypto.Hashing.XenomHash;
 using Miningcore.Extensions;
 using Miningcore.Stratum;
 using Miningcore.Time;
@@ -185,9 +184,32 @@ public class KaspaJob
 
     protected virtual Span<byte> ComputeCoinbase(Span<byte> prePowHash, Span<byte> data)
     {
-        var xenomMatrix = XenomMatrix.Generate(prePowHash.ToArray());
-        var hash = xenomMatrix.HeavyHash(data.ToArray());
-        return hash;
+        ushort[][] matrix = GenerateMatrix(prePowHash);
+        ushort[] vector = new ushort[64];
+        ushort[] product = new ushort[64];
+        for (int i = 0; i < 32; i++)
+        {
+            vector[2 * i] = (ushort)(data[i] >> 4);
+            vector[2 * i + 1] = (ushort)(data[i] & 0x0F);
+        }
+
+        for (int i = 0; i < 64; i++)
+        {
+            ushort sum = 0;
+            for (int j = 0; j < 64; j++)
+            {
+                sum += (ushort)(matrix[i][j] * vector[j]);
+            }
+            product[i] = (ushort)(sum >> 10);
+        }
+
+        byte[] res = new byte[32];
+        for (int i = 0; i < 32; i++)
+        {
+            res[i] = (byte)(data[i] ^ ((byte)(product[2 * i] << 4) | (byte)product[2 * i + 1]));
+        }
+
+        return (Span<byte>) res;
     }
 
     protected virtual Span<byte> SerializeCoinbase(Span<byte> prePowHash, long timestamp, ulong nonce)
@@ -255,8 +277,8 @@ public class KaspaJob
             stream.Write(blueWorkBytes);
 
             stream.Write(header.PruningPoint.HexToByteArray());
-            var xenomMatrix = XenomMatrix.Generate(hashBytes.ToArray());
-            new XenomHasher(xenomMatrix).Digest(stream.ToArray(), hashBytes);
+
+            blockHeaderHasher.Digest(stream.ToArray(), hashBytes);
 
             return (Span<byte>) hashBytes.ToArray();
         }
@@ -306,7 +328,7 @@ public class KaspaJob
         //var isBlockCandidate = true;
 
         // test if share meets at least workers current difficulty
-        if(!isBlockCandidate)
+        if(!isBlockCandidate && ratio < 0.99)
         {
             // check if share matched the previous difficulty from before a vardiff retarget
             if(context.VarDiff?.LastUpdate != null && context.PreviousDifficulty.HasValue)

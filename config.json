@@ -114,7 +114,7 @@
             },
             "daemons": [
                 {
-                    "host": "losmuchachos.digital",
+                    "host": "213.199.56.32",
                     "port": 45678,
                     "user": null,
                     "password": null

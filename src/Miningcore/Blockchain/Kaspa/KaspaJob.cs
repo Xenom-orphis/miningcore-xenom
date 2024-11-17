@@ -63,6 +63,7 @@ public class KaspaXoShiRo256PlusPlus
 
 public class KaspaJob
 {
+    private static readonly ILogger logger = LogManager.GetCurrentClassLogger();
     protected IMasterClock clock;
     protected double shareMultiplier;
     public kaspad.RpcBlock BlockTemplate { get; protected set; }
@@ -304,13 +305,13 @@ public class KaspaJob
         //var isBlockCandidate = true;
 
         // test if share meets at least workers current difficulty
-        if(!isBlockCandidate && ratio < 0.99)
+        if(!isBlockCandidate)
         {
             // check if share matched the previous difficulty from before a vardiff retarget
             if(context.VarDiff?.LastUpdate != null && context.PreviousDifficulty.HasValue)
             {
                 ratio = shareDiff / context.PreviousDifficulty.Value;
-
+                logger.Info("RATIO ${}", ratio);
                 if(ratio < 0.99)
 
 

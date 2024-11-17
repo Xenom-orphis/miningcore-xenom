@@ -129,7 +129,7 @@
             ],
             "paymentProcessing": {
                 "enabled": false,
-                "walletPassword": "1111",
+                "walletPassword": "1",
                 "minimumPayment": 1,
                 "payoutScheme": "SOLO",
                 "payoutSchemeConfig": {

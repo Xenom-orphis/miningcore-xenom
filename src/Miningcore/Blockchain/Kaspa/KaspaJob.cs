@@ -171,19 +171,19 @@ public class KaspaJob
         return rank;
     }
 
-    protected virtual Span<byte> ComputeCoinbase(ReadOnlySpan<byte> hash)
+    protected virtual Span<byte> ComputeCoinbase(Span<byte> prePowHash, Span<byte> data)
     {
         // Initialize the vector to hold 64 bytes
         byte[] vec = new byte[64];
         for (int i = 0; i < 32; i++)
         {
-            byte element = hash[i];
+            byte element = data[i];
             vec[2 * i] = (byte)(element >> 4);       // High 4 bits
             vec[2 * i + 1] = (byte)(element & 0x0F); // Low 4 bits
         }
 
         // Assuming 'matrix' is a field similar to 'self.0' in Rust
-        ushort[,] matrix = GenerateMatrix(hash);
+        ushort[,] matrix = GenerateMatrix(prePowHash);
 
         // Perform matrix-vector multiplication and process sums
         byte[] product = new byte[32];
@@ -207,12 +207,12 @@ public class KaspaJob
         // XOR the product with the original hash bytes
         for (int i = 0; i < 32; i++)
         {
-            product[i] ^= hash[i];
+            product[i] ^= data[i];
         }
 
 
 
-        return product;
+        return (Span<byte>) product;
     }
 
     protected virtual Span<byte> SerializeCoinbase(Span<byte> prePowHash, long timestamp, ulong nonce)

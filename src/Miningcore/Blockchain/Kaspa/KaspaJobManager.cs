@@ -332,10 +332,8 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
 
 
 
-                    string coinbaseBlockHashs = KaspaConstants.CoinbaseBlockHash;
-                    byte[] hashBytess = Encoding.UTF8.GetBytes(coinbaseBlockHashs.PadRight(32, '\0')).Take(32).ToArray();
-                    XenomMatrix matrix =  XenomMatrix.Generate(hashBytess);
-                    customBlockHeaderHasher = new XenomHasher(matrix);
+                customBlockHeaderHasher = new Blake2b(Encoding.UTF8.GetBytes(KaspaConstants.CoinbaseBlockHash));
+
 
 
                 if (customCoinbaseHasher is not Blake3)

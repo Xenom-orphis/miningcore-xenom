@@ -328,28 +328,26 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
                 return new PyrinJob(customBlockHeaderHasher, customCoinbaseHasher, customShareHasher);
 
             case "XEN":
+                logger.Debug(() => $"blake3HardFork activated");
 
+                if (customBlockHeaderHasher is not Blake3)
+                {
+                    string coinbaseBlockHash = KaspaConstants.CoinbaseBlockHash;
+                    byte[] hashBytes = Encoding.UTF8.GetBytes(coinbaseBlockHash.PadRight(32, '\0')).Take(32).ToArray();
 
-                    logger.Debug(() => $"blake3HardFork activated");
-                    logger.Debug(() => $"blake3HardFork activated");
+                    logger.Debug(() => $"Generated hashBytes size: {hashBytes.Length}");
 
-                    if(customBlockHeaderHasher is not Blake3)
-                    {
+                    var xenomMatrix = XenomMatrix.Generate(hashBytes);
+                    customBlockHeaderHasher = new XenomHasher(xenomMatrix);
+                }
 
+                if (customCoinbaseHasher is not Blake3)
+                    customCoinbaseHasher = new Blake3();
 
-                        string coinbaseBlockHash = KaspaConstants.CoinbaseBlockHash;
-                        byte[] hashBytes = Encoding.UTF8.GetBytes(coinbaseBlockHash.PadRight(32, '\0')).Take(32).ToArray();
-                        var xenomMatrix = XenomMatrix.Generate(hashBytes);
-                        customBlockHeaderHasher =  new XenomHasher(xenomMatrix);
-                    }
+                if (customShareHasher is not Blake3)
+                    customShareHasher = new Blake3();
 
-                    if(customCoinbaseHasher is not Blake3)
-                        customCoinbaseHasher = new Blake3();
-
-                    if(customShareHasher is not Blake3)
-                        customShareHasher = new Blake3();
-
-                    return new XenomJob(customBlockHeaderHasher, customCoinbaseHasher, customShareHasher);
+                return new XenomJob(customBlockHeaderHasher, customCoinbaseHasher, customShareHasher);
 
             case "SPR":
                 if(customBlockHeaderHasher is not Blake2b)

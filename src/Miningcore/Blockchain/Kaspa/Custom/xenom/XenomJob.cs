@@ -54,11 +54,15 @@ public class XenomMatrix
         _matrix = matrix;
     }
 
-    public static XenomMatrix Generate(byte[] prePowHash)
+    public static XenomMatrix Generate(byte[] hashBytes)
     {
-        var generator = new XoShiRo256PlusPlus(prePowHash);
+        if (hashBytes.Length != 32)
+            throw new ArgumentException("hashBytes must be exactly 32 bytes");
+
+        var generator = new XoShiRo256PlusPlus(hashBytes);
         var matrix = new ushort[64, 64];
 
+        // Matrix generation logic
         while (true)
         {
             for (int i = 0; i < 64; i++)

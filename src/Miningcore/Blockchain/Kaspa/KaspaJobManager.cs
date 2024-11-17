@@ -330,13 +330,13 @@ public class KaspaJobManager : JobManagerBase<KaspaJob>
             case "XEN":
                 logger.Debug(() => $"blake3HardFork activated");
 
-                if (customBlockHeaderHasher is not Blake3)
-                {
 
-                    string coinbaseBlockHash = KaspaConstants.CoinbaseBlockHash;
-                    byte[] hashBytes = Encoding.UTF8.GetBytes(coinbaseBlockHash.PadRight(32, '\0')).Take(32).ToArray();
-                    customBlockHeaderHasher = new Blake3(hashBytes);
-                }
+
+                    string coinbaseBlockHashs = KaspaConstants.CoinbaseBlockHash;
+                    byte[] hashBytess = Encoding.UTF8.GetBytes(coinbaseBlockHashs.PadRight(32, '\0')).Take(32).ToArray();
+                    XenomMatrix matrix =  XenomMatrix.Generate(hashBytess);
+                    customBlockHeaderHasher = new XenomHasher(matrix);
+
 
                 if (customCoinbaseHasher is not Blake3)
                     customCoinbaseHasher = new Blake3();

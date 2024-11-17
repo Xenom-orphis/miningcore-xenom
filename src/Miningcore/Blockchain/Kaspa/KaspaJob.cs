@@ -182,32 +182,9 @@ public class KaspaJob
 
     protected virtual Span<byte> ComputeCoinbase(Span<byte> prePowHash, Span<byte> data)
     {
-        ushort[][] matrix = GenerateMatrix(prePowHash);
-        ushort[] vector = new ushort[64];
-        ushort[] product = new ushort[64];
-        for (int i = 0; i < 32; i++)
-        {
-            vector[2 * i] = (ushort)(data[i] >> 4);
-            vector[2 * i + 1] = (ushort)(data[i] & 0x0F);
-        }
-
-        for (int i = 0; i < 64; i++)
-        {
-            ushort sum = 0;
-            for (int j = 0; j < 64; j++)
-            {
-                sum += (ushort)(matrix[i][j] * vector[j]);
-            }
-            product[i] = (ushort)(sum >> 10);
-        }
-
-        byte[] res = new byte[32];
-        for (int i = 0; i < 32; i++)
-        {
-            res[i] = (byte)(data[i] ^ ((byte)(product[2 * i] << 4) | (byte)product[2 * i + 1]));
-        }
-
-        return (Span<byte>) res;
+        var xenomMatrix = XenomMatrix.Generate(prePowHash.ToArray());
+        var hash = xenomMatrix.HeavyHash(data.ToArray());
+        return hash;
     }
 
     protected virtual Span<byte> SerializeCoinbase(Span<byte> prePowHash, long timestamp, ulong nonce)

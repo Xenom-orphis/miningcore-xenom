@@ -3,7 +3,6 @@ using System.Globalization;
 using System.Numerics;
 using System.Collections.Concurrent;
 using System.Text;
-using Miningcore.Blockchain.Kaspa.Custom.Xenom;
 using Miningcore.Contracts;
 using Miningcore.Crypto;
 using Miningcore.Crypto.Hashing.Algorithms;
@@ -12,7 +11,6 @@ using Miningcore.Stratum;
 using Miningcore.Time;
 using Miningcore.Util;
 using NBitcoin;
-using NLog;
 using kaspad = Miningcore.Blockchain.Kaspa.Kaspad;
 
 namespace Miningcore.Blockchain.Kaspa;
@@ -31,26 +29,20 @@ public class KaspaXoShiRo256PlusPlus
         }
     }
 
-    public ulong Next()
+    public ulong Uint64()
     {
-        // Calculate the result of the next number
-        ulong result = RotateLeft(s[0] + s[3], 23) + s[0];
-
-        // Perform the XoShiRo256++ state transitions
-        ulong t = s[1] << 17;
-
-        s[2] ^= s[0];
-        s[3] ^= s[1];
-        s[1] ^= s[2];
-        s[0] ^= s[3];
-
-        s[2] ^= t;
-        s[3] = RotateLeft(s[3], 45);
-
+        ulong result = RotateLeft64(this.s[0] + this.s[3], 23) + this.s[0];
+        ulong t = this.s[1] << 17;
+        this.s[2] ^= this.s[0];
+        this.s[3] ^= this.s[1];
+        this.s[1] ^= this.s[2];
+        this.s[0] ^= this.s[3];
+        this.s[2] ^= t;
+        this.s[3] = RotateLeft64(this.s[3], 45);
         return result;
     }
 
-    private static ulong RotateLeft(ulong value, int offset)
+    private static ulong RotateLeft64(ulong value, int offset)
     {
         return (value << offset) | (value >> (64 - offset));
     }
@@ -63,7 +55,6 @@ public class KaspaXoShiRo256PlusPlus
 
 public class KaspaJob
 {
-    private static readonly ILogger logger = LogManager.GetCurrentClassLogger();
     protected IMasterClock clock;
     protected double shareMultiplier;
     public kaspad.RpcBlock BlockTemplate { get; protected set; }
@@ -98,78 +89,78 @@ public class KaspaJob
         return submissions.TryAdd(key, true);
     }
 
-    protected virtual ushort[][] GenerateMatrix(Span<byte> prePowHash)
+    private ushort[,] GenerateMatrix(ReadOnlySpan<byte> prePowHash)
     {
+        ushort[,] matrix = new ushort[64, 64];
 
+        var generator = new KaspaXoShiRo256PlusPlus(prePowHash.ToArray());
 
-        if(prePowHash.Length != 32)
-            throw new ArgumentException("hashBytes must be exactly 32 bytes");
-
-        var generator = new XoShiRo256PlusPlus(prePowHash.ToArray());
-        var matrix = new ushort[64][];
-
-        for(int i = 0; i < 64; i++)
+        while (true)
         {
-            matrix[i] = new ushort[64];
-        }
-
-        // Matrix generation logic
-        while(true)
-        {
-            for(int i = 0; i < 64; i++)
+            for (int i = 0; i < 64; i++)
             {
-                for(int j = 0; j < 64; j += 16)
+                for (int j = 0; j < 64; j += 16)
                 {
-                    ulong value = generator.Next();
-                    for(int shift = 0; shift < 16; shift++)
+                    ulong val = generator.Uint64();
+                    for (int shift = 0; shift < 16; shift++)
                     {
-                        matrix[i][j + shift] = (ushort) ((value >> (4 * shift)) & 0x0F);
+                        matrix[i, j + shift] = (ushort)((val >> (4 * shift)) & 0x0F);
                     }
                 }
             }
-
-            if(ComputeRank(matrix) == 64)
-                break;
-
+            if (ComputeRank(matrix) == 64)
+                return matrix;
         }
-        return new XenomMatrix(matrix)._matrix;
     }
 
-    private static int ComputeRank(ushort[][] matrix)
+    protected virtual int ComputeRank(ushort[,] matrix)
     {
+        int numRows = matrix.GetLength(0); // Should be 64
+        int numCols = matrix.GetLength(1); // Should be 64
         int rank = 0;
-        double epsilon = 1e-9;
-        var rows = Enumerable.Range(0, 64).Select(i => Enumerable.Range(0, 64).Select(j => (double)matrix[i][j]).ToArray()).ToArray();
-        bool[] selected = new bool[64];
 
-        for (int i = 0; i < 64; i++)
+        // Create a copy of the matrix to avoid modifying the original
+        ushort[,] mat = new ushort[numRows, numCols];
+        Array.Copy(matrix, mat, matrix.Length);
+
+        // Perform Gaussian elimination over GF(2)
+        for (int col = 0; col < numCols; col++)
         {
             int pivotRow = -1;
-            for (int j = 0; j < 64; j++)
+            for (int row = rank; row < numRows; row++)
             {
-                if (!selected[j] && Math.Abs(rows[j][i]) > epsilon)
+                if ((mat[row, col] & 1) != 0) // Check if the least significant bit is 1
                 {
-                    pivotRow = j;
+                    pivotRow = row;
                     break;
                 }
             }
 
-            if (pivotRow == -1) continue;
-
-            selected[pivotRow] = true;
-            double pivotValue = rows[pivotRow][i];
-            for (int k = i; k < 64; k++)
+            if (pivotRow == -1)
             {
-                rows[pivotRow][k] /= pivotValue;
+                continue; // No pivot in this column
             }
 
-            for (int j = 0; j < 64; j++)
+            // Swap the current row with the pivot row
+            if (pivotRow != rank)
             {
-                if (j != pivotRow && Math.Abs(rows[j][i]) > epsilon)
+                // Swap rows rank and pivotRow
+                for (int k = 0; k < numCols; k++)
                 {
-                    for (int k = i; k < 64; k++)
+                    ushort temp = mat[rank, k];
+                    mat[rank, k] = mat[pivotRow, k];
+                    mat[pivotRow, k] = temp;
+                }
+            }
+
+            // Eliminate the current column entries in other rows
+            for (int row = 0; row < numRows; row++)
+            {
+                if (row != rank && (mat[row, col] & 1) != 0)
+                {
+                    for (int k = col; k < numCols; k++)
                     {
-                        rows[j][k] -= rows[pivotRow][k] * rows[j][i];
+                        mat[row, k] ^= mat[rank, k];
                     }
                 }
             }
@@ -180,36 +171,48 @@ public class KaspaJob
         return rank;
     }
 
-
-
     protected virtual Span<byte> ComputeCoinbase(Span<byte> prePowHash, Span<byte> data)
     {
-        ushort[][] matrix = GenerateMatrix(prePowHash);
-        ushort[] vector = new ushort[64];
-        ushort[] product = new ushort[64];
+        // Initialize the vector to hold 64 bytes
+        byte[] vec = new byte[64];
         for (int i = 0; i < 32; i++)
         {
-            vector[2 * i] = (ushort)(data[i] >> 4);
-            vector[2 * i + 1] = (ushort)(data[i] & 0x0F);
+            byte element = data[i];
+            vec[2 * i] = (byte)(element >> 4);       // High 4 bits
+            vec[2 * i + 1] = (byte)(element & 0x0F); // Low 4 bits
         }
 
-        for (int i = 0; i < 64; i++)
+        // Assuming 'matrix' is a field similar to 'self.0' in Rust
+        ushort[,] matrix = GenerateMatrix(prePowHash);
+
+        // Perform matrix-vector multiplication and process sums
+        byte[] product = new byte[32];
+        for (int i = 0; i < 32; i++)
         {
-            ushort sum = 0;
+            ushort sum1 = 0;
+            ushort sum2 = 0;
             for (int j = 0; j < 64; j++)
             {
-                sum += (ushort)(matrix[i][j] * vector[j]);
+                sum1 += (ushort)(matrix[2 * i, j] * vec[j]);
+                sum2 += (ushort)(matrix[2 * i + 1, j] * vec[j]);
             }
-            product[i] = (ushort)(sum >> 10);
+
+            // Process the sums as per Rust code
+            byte processedSum1 = (byte)(((sum1 & 0xF) ^ ((sum1 >> 4) & 0xF) ^ ((sum1 >> 8) & 0xF)) << 4);
+            byte processedSum2 = (byte)((sum2 & 0xF) ^ ((sum2 >> 4) & 0xF) ^ ((sum2 >> 8) & 0xF));
+
+            product[i] = (byte)(processedSum1 | processedSum2);
         }
 
-        byte[] res = new byte[32];
+        // XOR the product with the original hash bytes
         for (int i = 0; i < 32; i++)
         {
-            res[i] = (byte)(data[i] ^ ((byte)(product[2 * i] << 4) | (byte)product[2 * i + 1]));
+            product[i] ^= data[i];
         }
 
-        return (Span<byte>) res;
+
+
+        return (Span<byte>) product;
     }
 
     protected virtual Span<byte> SerializeCoinbase(Span<byte> prePowHash, long timestamp, ulong nonce)
@@ -334,17 +337,16 @@ public class KaspaJob
             if(context.VarDiff?.LastUpdate != null && context.PreviousDifficulty.HasValue)
             {
                 ratio = shareDiff / context.PreviousDifficulty.Value;
-                logger.Info("RATIO ${}", ratio);
+
                 if(ratio < 0.99)
-
-
-                    //throw new StratumException(StratumError.LowDifficultyShare, $"low difficulty share ({shareDiff})");
+                   // throw new StratumException(StratumError.LowDifficultyShare, $"low difficulty share ({shareDiff})");
 
                 // use previous difficulty
                 stratumDifficulty = context.PreviousDifficulty.Value;
             }
 
-
+            //else
+                //throw new StratumException(StratumError.LowDifficultyShare, $"low difficulty share ({shareDiff})");
         }
 
         var result = new Share

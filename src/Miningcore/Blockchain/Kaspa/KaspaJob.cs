@@ -22,7 +22,7 @@ public class KaspaXoShiRo256PlusPlus
     public KaspaXoShiRo256PlusPlus(Span<byte> prePowHash)
     {
         Contract.Requires<ArgumentException>(prePowHash.Length >= 32);
-        
+
         for (int i = 0; i < 4; i++)
         {
             s[i] = BitConverter.ToUInt64(prePowHash.Slice(i * 8, 8));
@@ -61,7 +61,7 @@ public class KaspaJob
     public double Difficulty { get; protected set; }
     public string JobId { get; protected set; }
     public uint256 blockTargetValue { get; protected set; }
-    
+
     protected object[] jobParams;
     private readonly ConcurrentDictionary<string, bool> submissions = new(StringComparer.OrdinalIgnoreCase);
 
@@ -79,7 +79,7 @@ public class KaspaJob
         this.coinbaseHasher = customCoinbaseHasher;
         this.shareHasher = customShareHasher;
     }
-    
+
     protected bool RegisterSubmit(string nonce)
     {
         var key = new StringBuilder()
@@ -88,16 +88,13 @@ public class KaspaJob
 
         return submissions.TryAdd(key, true);
     }
-    
-    protected virtual ushort[][] GenerateMatrix(Span<byte> prePowHash)
+
+    private ushort[,] GenerateMatrix(ReadOnlySpan<byte> prePowHash)
     {
-        ushort[][] matrix = new ushort[64][];
-        for (int i = 0; i < 64; i++)
-        {
-            matrix[i] = new ushort[64];
-        }
-        
-        var generator = new KaspaXoShiRo256PlusPlus(prePowHash);
+        ushort[,] matrix = new ushort[64, 64];
+
+        var generator = new KaspaXoShiRo256PlusPlus(prePowHash.ToArray());
+
         while (true)
         {
             for (int i = 0; i < 64; i++)
@@ -107,129 +104,163 @@ public class KaspaJob
                     ulong val = generator.Uint64();
                     for (int shift = 0; shift < 16; shift++)
                     {
-                        matrix[i][j + shift] = (ushort)((val >> (4 * shift)) & 0x0F);
+                        matrix[i, j + shift] = (ushort)((val >> (4 * shift)) & 0x0F);
                     }
                 }
             }
-            if(ComputeRank(matrix) == 64)
+            if (ComputeRank(matrix) == 64)
                 return matrix;
         }
     }
-    
-    protected virtual int ComputeRank(ushort[][] matrix)
+
+    protected virtual int ComputeRank(ushort[,] matrix)
     {
-        double Eps = 0.000000001;
-        double[][] B = matrix.Select(row => row.Select(val => (double)val).ToArray()).ToArray();
+        int numRows = matrix.GetLength(0); // Should be 64
+        int numCols = matrix.GetLength(1); // Should be 64
         int rank = 0;
-        bool[] rowSelected = new bool[64];
-        for (int i = 0; i < 64; i++)
+
+        // Create a copy of the matrix to avoid modifying the original
+        ushort[,] mat = new ushort[numRows, numCols];
+        Array.Copy(matrix, mat, matrix.Length);
+
+        // Perform Gaussian elimination over GF(2)
+        for (int col = 0; col < numCols; col++)
         {
-            int j;
-            for (j = 0; j < 64; j++)
+            int pivotRow = -1;
+            for (int row = rank; row < numRows; row++)
             {
-                if(!rowSelected[j] && Math.Abs(B[j][i]) > Eps)
+                if ((mat[row, col] & 1) != 0) // Check if the least significant bit is 1
+                {
+                    pivotRow = row;
                     break;
-            }
-            if(j != 64)
-            {
-                rank++;
-                rowSelected[j] = true;
-                double pivot = B[j][i];
-                for (int p = i + 1; p < 64; p++)
-                {
-                    B[j][p] /= pivot;
                 }
-                for (int k = 0; k < 64; k++)
+            }
+
+            if (pivotRow == -1)
+            {
+                continue; // No pivot in this column
+            }
+
+            // Swap the current row with the pivot row
+            if (pivotRow != rank)
+            {
+                // Swap rows rank and pivotRow
+                for (int k = 0; k < numCols; k++)
                 {
-                    if(k != j && Math.Abs(B[k][i]) > Eps)
+                    ushort temp = mat[rank, k];
+                    mat[rank, k] = mat[pivotRow, k];
+                    mat[pivotRow, k] = temp;
+                }
+            }
+
+            // Eliminate the current column entries in other rows
+            for (int row = 0; row < numRows; row++)
+            {
+                if (row != rank && (mat[row, col] & 1) != 0)
+                {
+                    for (int k = col; k < numCols; k++)
                     {
-                        for (int p = i + 1; p < 64; p++)
-                        {
-                            B[k][p] -= B[j][p] * B[k][i];
-                        }
+                        mat[row, k] ^= mat[rank, k];
                     }
                 }
             }
+
+            rank++;
         }
+
         return rank;
     }
-    
-    protected virtual Span<byte> ComputeCoinbase(Span<byte> prePowHash, Span<byte> data)
+
+    protected virtual Span<byte> ComputeCoinbase(ReadOnlySpan<byte> hash)
     {
-        ushort[][] matrix = GenerateMatrix(prePowHash);
-        ushort[] vector = new ushort[64];
-        ushort[] product = new ushort[64];
+        // Initialize the vector to hold 64 bytes
+        byte[] vec = new byte[64];
         for (int i = 0; i < 32; i++)
         {
-            vector[2 * i] = (ushort)(data[i] >> 4);
-            vector[2 * i + 1] = (ushort)(data[i] & 0x0F);
+            byte element = hash[i];
+            vec[2 * i] = (byte)(element >> 4);       // High 4 bits
+            vec[2 * i + 1] = (byte)(element & 0x0F); // Low 4 bits
         }
 
-        for (int i = 0; i < 64; i++)
+        // Assuming 'matrix' is a field similar to 'self.0' in Rust
+        ushort[,] matrix = GenerateMatrix(hash);
+
+        // Perform matrix-vector multiplication and process sums
+        byte[] product = new byte[32];
+        for (int i = 0; i < 32; i++)
         {
-            ushort sum = 0;
+            ushort sum1 = 0;
+            ushort sum2 = 0;
             for (int j = 0; j < 64; j++)
             {
-                sum += (ushort)(matrix[i][j] * vector[j]);
+                sum1 += (ushort)(matrix[2 * i, j] * vec[j]);
+                sum2 += (ushort)(matrix[2 * i + 1, j] * vec[j]);
             }
-            product[i] = (ushort)(sum >> 10);
+
+            // Process the sums as per Rust code
+            byte processedSum1 = (byte)(((sum1 & 0xF) ^ ((sum1 >> 4) & 0xF) ^ ((sum1 >> 8) & 0xF)) << 4);
+            byte processedSum2 = (byte)((sum2 & 0xF) ^ ((sum2 >> 4) & 0xF) ^ ((sum2 >> 8) & 0xF));
+
+            product[i] = (byte)(processedSum1 | processedSum2);
         }
 
-        byte[] res = new byte[32];
+        // XOR the product with the original hash bytes
         for (int i = 0; i < 32; i++)
         {
-            res[i] = (byte)(data[i] ^ ((byte)(product[2 * i] << 4) | (byte)product[2 * i + 1]));
+            product[i] ^= hash[i];
         }
-        
-        return (Span<byte>) res;
+
+
+
+        return product;
     }
-    
+
     protected virtual Span<byte> SerializeCoinbase(Span<byte> prePowHash, long timestamp, ulong nonce)
     {
         Span<byte> hashBytes = stackalloc byte[32];
-        
+
         using(var stream = new MemoryStream())
         {
             stream.Write(prePowHash);
             stream.Write(BitConverter.GetBytes((ulong) timestamp));
             stream.Write(new byte[32]); // 32 zero bytes padding
             stream.Write(BitConverter.GetBytes(nonce));
-            
+
             coinbaseHasher.Digest(stream.ToArray(), hashBytes);
-            
+
             return (Span<byte>) hashBytes.ToArray();
         }
     }
-    
+
     protected virtual Span<byte> SerializeHeader(kaspad.RpcBlockHeader header, bool isPrePow = true)
     {
         ulong nonce = isPrePow ? 0 : header.Nonce;
         long timestamp = isPrePow ? 0 : header.Timestamp;
         Span<byte> hashBytes = stackalloc byte[32];
         //var blockHashBytes = Encoding.UTF8.GetBytes(KaspaConstants.CoinbaseBlockHash);
-        
+
         using(var stream = new MemoryStream())
         {
             var versionBytes = (!BitConverter.IsLittleEndian) ? BitConverter.GetBytes((ushort) header.Version).ReverseInPlace() : BitConverter.GetBytes((ushort) header.Version);
             stream.Write(versionBytes);
             var parentsBytes = (!BitConverter.IsLittleEndian) ? BitConverter.GetBytes((ulong) header.Parents.Count).ReverseInPlace() : BitConverter.GetBytes((ulong) header.Parents.Count);
             stream.Write(parentsBytes);
-            
+
             foreach (var parent in header.Parents)
             {
                 var parentHashesBytes = (!BitConverter.IsLittleEndian) ? BitConverter.GetBytes((ulong) parent.ParentHashes.Count).ReverseInPlace() : BitConverter.GetBytes((ulong) parent.ParentHashes.Count);
                 stream.Write(parentHashesBytes);
-                
+
                 foreach (var parentHash in parent.ParentHashes)
                 {
                     stream.Write(parentHash.HexToByteArray());
                 }
             }
-            
+
             stream.Write(header.HashMerkleRoot.HexToByteArray());
             stream.Write(header.AcceptedIdMerkleRoot.HexToByteArray());
             stream.Write(header.UtxoCommitment.HexToByteArray());
-            
+
             var timestampBytes = (!BitConverter.IsLittleEndian) ? BitConverter.GetBytes((ulong) timestamp).ReverseInPlace() : BitConverter.GetBytes((ulong) timestamp);
             stream.Write(timestampBytes);
             var bitsBytes = (!BitConverter.IsLittleEndian) ? BitConverter.GetBytes(header.Bits).ReverseInPlace() : BitConverter.GetBytes(header.Bits);
@@ -240,18 +271,18 @@ public class KaspaJob
             stream.Write(daaScoreBytes);
             var blueScoreBytes = (!BitConverter.IsLittleEndian) ? BitConverter.GetBytes(header.BlueScore).ReverseInPlace() : BitConverter.GetBytes(header.BlueScore);
             stream.Write(blueScoreBytes);
-            
+
             var blueWork = header.BlueWork.PadLeft(header.BlueWork.Length + (header.BlueWork.Length % 2), '0');
             var blueWorkBytes = blueWork.HexToByteArray();
-            
+
             var blueWorkLengthBytes = (!BitConverter.IsLittleEndian) ? BitConverter.GetBytes((ulong) blueWorkBytes.Length).ReverseInPlace() : BitConverter.GetBytes((ulong) blueWorkBytes.Length);
             stream.Write(blueWorkLengthBytes);
             stream.Write(blueWorkBytes);
-            
+
             stream.Write(header.PruningPoint.HexToByteArray());
 
             blockHeaderHasher.Digest(stream.ToArray(), hashBytes);
-            
+
             return (Span<byte>) hashBytes.ToArray();
         }
     }
@@ -260,11 +291,11 @@ public class KaspaJob
     {
         ulong[] preHashU64s = new ulong[4];
         string preHashStrings = "";
-        
+
         for (int i = 0; i < 4; i++)
         {
             var slice = prePowHash.Slice(i * 8, 8);
-            
+
             preHashStrings += slice.ToHexString().PadLeft(16, '0');
             preHashU64s[i] = BitConverter.ToUInt64(slice);
         }
@@ -347,16 +378,16 @@ public class KaspaJob
         Contract.Requires<ArgumentException>(!string.IsNullOrEmpty(nonce));
 
         var context = worker.ContextAs<KaspaWorkerContext>();
-        
+
         // We don't need "0x"
         nonce = (nonce.StartsWith("0x")) ? nonce.Substring(2) : nonce;
-        
+
         // Add extranonce to nonce if enabled and submitted nonce is shorter than expected (16 - <extranonce length> characters)
         if (nonce.Length <= (KaspaConstants.NonceLength - context.ExtraNonce1.Length))
         {
             nonce = context.ExtraNonce1.PadRight(KaspaConstants.NonceLength - context.ExtraNonce1.Length, '0') + nonce;
         }
-        
+
         // dupe check
         if(!RegisterSubmit(nonce))
             throw new StratumException(StratumError.DuplicateShare, $"duplicate share");
@@ -369,7 +400,7 @@ public class KaspaJob
         Contract.RequiresNonNull(blockTemplate);
         Contract.Requires<ArgumentException>(!string.IsNullOrEmpty(jobId));
         Contract.RequiresNonNull(shareMultiplier);
-        
+
         JobId = jobId;
         this.shareMultiplier = shareMultiplier;
 
@@ -377,7 +408,7 @@ public class KaspaJob
         Difficulty = KaspaUtils.TargetToDifficulty(target.ToBigInteger()) * (double) KaspaConstants.MinHash;
         blockTargetValue = target.ToUInt256();
         BlockTemplate = blockTemplate;
-        
+
         var (largeJob, regularJob) = SerializeJobParamsData(SerializeHeader(blockTemplate.Header));
         jobParams = new object[]
         {

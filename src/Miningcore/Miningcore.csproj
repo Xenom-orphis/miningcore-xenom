@@ -69,7 +69,7 @@
         <PackageReference Include="McMaster.Extensions.CommandLineUtils" Version="4.0.2" />
         <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
-        <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.0" />
         <PackageReference Include="NBitcoin" Version="7.0.36" />
         <PackageReference Include="NBitcoin.Altcoins" Version="3.0.21" />
         <PackageReference Include="NBitcoin.Zcash" Version="3.0.0" />
